@@ -1,0 +1,671 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model ai_conversations {
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  student_id       String           @db.Uuid
+  question_id      String?          @db.Uuid
+  title            String?          @db.VarChar(255)
+  created_at       DateTime         @default(now()) @db.Timestamp(6)
+  questions        questions?       @relation(fields: [question_id], references: [id], onUpdate: NoAction)
+  student_profiles student_profiles @relation(fields: [student_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+  ai_messages      ai_messages[]
+}
+
+model ai_generation_requests {
+  id                    String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  requested_by          String            @db.Uuid
+  grade_id              String            @db.Uuid
+  chapter_id            String?           @db.Uuid
+  topic_id              String?           @db.Uuid
+  question_type         String?           @db.VarChar(50)
+  difficulty            difficulty_level?
+  quantity              Int
+  ai_model              String?           @db.VarChar(50)
+  prompt_text           String?
+  raw_response          Json?
+  status                generation_status @default(processing)
+  resulting_exercise_id String?           @db.Uuid
+  created_at            DateTime          @default(now()) @db.Timestamp(6)
+  chapters              chapters?         @relation(fields: [chapter_id], references: [id], onUpdate: NoAction)
+  grades                grades            @relation(fields: [grade_id], references: [id], onUpdate: NoAction)
+  user                  user              @relation(fields: [requested_by], references: [id], onUpdate: NoAction)
+  exercises             exercises?        @relation(fields: [resulting_exercise_id], references: [id], onUpdate: NoAction)
+  topics                topics?           @relation(fields: [topic_id], references: [id], onUpdate: NoAction)
+}
+
+model ai_messages {
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  conversation_id  String           @db.Uuid
+  sender           sender_type
+  content          String
+  language         message_language @default(vi)
+  created_at       DateTime         @default(now()) @db.Timestamp(6)
+  ai_conversations ai_conversations @relation(fields: [conversation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model analytics_snapshots {
+  id                 String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  student_id         String           @db.Uuid
+  period_type        analytics_period
+  period_start       DateTime         @db.Date
+  period_end         DateTime         @db.Date
+  avg_score          Decimal?         @db.Decimal(5, 2)
+  completion_rate    Decimal?         @db.Decimal(5, 2)
+  study_time_minutes Int?
+  weak_topics        Json?
+  at_risk_flag       Boolean          @default(false)
+  created_at         DateTime         @default(now()) @db.Timestamp(6)
+  student_profiles   student_profiles @relation(fields: [student_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([student_id, period_start], map: "idx_analytics_snapshots_student_period")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model assignments {
+  id               String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  exercise_id      String            @db.Uuid
+  assigned_by      String            @db.Uuid
+  class_id         String?           @db.Uuid
+  group_id         String?           @db.Uuid
+  student_id       String?           @db.Uuid
+  start_date       DateTime?         @db.Timestamp(6)
+  due_date         DateTime?         @db.Timestamp(6)
+  created_at       DateTime          @default(now()) @db.Timestamp(6)
+  teacher_profiles teacher_profiles  @relation(fields: [assigned_by], references: [user_id], onUpdate: NoAction)
+  classes          classes?          @relation(fields: [class_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  exercises        exercises         @relation(fields: [exercise_id], references: [id], onUpdate: NoAction)
+  student_groups   student_groups?   @relation(fields: [group_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  student_profiles student_profiles? @relation(fields: [student_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+  submissions      submissions[]
+}
+
+model badges {
+  id                    String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                  String           @db.VarChar(100)
+  description           String?
+  icon_url              String?
+  condition_description String?
+  student_badges        student_badges[]
+}
+
+model challenge_participants {
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  challenge_id     String           @db.Uuid
+  student_id       String           @db.Uuid
+  score            Decimal          @default(0) @db.Decimal(6, 2)
+  rank             Int?
+  joined_at        DateTime         @default(now()) @db.Timestamp(6)
+  challenges       challenges       @relation(fields: [challenge_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  student_profiles student_profiles @relation(fields: [student_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([challenge_id, student_id])
+}
+
+model challenges {
+  id                     String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title                  String                   @db.VarChar(255)
+  description            String?
+  type                   challenge_type_enum
+  start_date             DateTime                 @db.Date
+  end_date               DateTime                 @db.Date
+  reward_points          Int                      @default(0)
+  challenge_participants challenge_participants[]
+}
+
+model chapters {
+  id                     String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  grade_id               String                   @db.Uuid
+  name                   String                   @db.VarChar(255)
+  order_index            Int
+  description            String?
+  ai_generation_requests ai_generation_requests[]
+  grades                 grades                   @relation(fields: [grade_id], references: [id], onUpdate: NoAction)
+  exercises              exercises[]
+  questions              questions[]
+  topics                 topics[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model class_analytics_snapshots {
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  class_id        String?          @db.Uuid
+  group_id        String?          @db.Uuid
+  period_type     analytics_period
+  period_start    DateTime         @db.Date
+  period_end      DateTime         @db.Date
+  avg_score       Decimal?         @db.Decimal(5, 2)
+  completion_rate Decimal?         @db.Decimal(5, 2)
+  created_at      DateTime         @default(now()) @db.Timestamp(6)
+  classes         classes?         @relation(fields: [class_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  student_groups  student_groups?  @relation(fields: [group_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model class_enrollments {
+  id               String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  class_id         String            @db.Uuid
+  student_id       String            @db.Uuid
+  status           enrollment_status @default(active)
+  joined_at        DateTime          @default(now()) @db.Timestamp(6)
+  classes          classes           @relation(fields: [class_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  student_profiles student_profiles  @relation(fields: [student_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([class_id, student_id])
+}
+
+model classes {
+  id                        String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                      String                      @db.VarChar(100)
+  grade_id                  String                      @db.Uuid
+  teacher_id                String                      @db.Uuid
+  created_at                DateTime                    @default(now()) @db.Timestamp(6)
+  assignments               assignments[]
+  class_analytics_snapshots class_analytics_snapshots[]
+  class_enrollments         class_enrollments[]
+  grades                    grades                      @relation(fields: [grade_id], references: [id], onUpdate: NoAction)
+  teacher_profiles          teacher_profiles            @relation(fields: [teacher_id], references: [user_id], onUpdate: NoAction)
+  student_groups            student_groups[]
+}
+
+model daily_missions {
+  id                       String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title                    String                     @db.VarChar(255)
+  description              String?
+  reward_points            Int                        @default(0)
+  valid_date               DateTime                   @db.Date
+  student_mission_progress student_mission_progress[]
+}
+
+model exercise_questions {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  exercise_id String    @db.Uuid
+  question_id String    @db.Uuid
+  order_index Int
+  points      Decimal   @default(1.0) @db.Decimal(5, 2)
+  exercises   exercises @relation(fields: [exercise_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  questions   questions @relation(fields: [question_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([exercise_id, question_id])
+}
+
+model exercises {
+  id                     String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title                  String                   @db.VarChar(255)
+  exercise_type          exercise_type_enum
+  grade_id               String                   @db.Uuid
+  chapter_id             String?                  @db.Uuid
+  topic_id               String?                  @db.Uuid
+  difficulty             difficulty_level_ext?
+  question_count         Int
+  is_ai_generated        Boolean                  @default(false)
+  created_by             String?                  @db.Uuid
+  created_at             DateTime                 @default(now()) @db.Timestamp(6)
+  ai_generation_requests ai_generation_requests[]
+  assignments            assignments[]
+  exercise_questions     exercise_questions[]
+  chapters               chapters?                @relation(fields: [chapter_id], references: [id], onUpdate: NoAction)
+  user                   user?                    @relation(fields: [created_by], references: [id], onUpdate: NoAction)
+  grades                 grades                   @relation(fields: [grade_id], references: [id], onUpdate: NoAction)
+  topics                 topics?                  @relation(fields: [topic_id], references: [id], onUpdate: NoAction)
+  recommendations        recommendations[]
+  submissions            submissions[]
+}
+
+model grades {
+  id                     String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                   String                   @unique @db.VarChar(20)
+  level_order            Int                      @unique
+  ai_generation_requests ai_generation_requests[]
+  chapters               chapters[]
+  classes                classes[]
+  exercises              exercises[]
+  questions              questions[]
+  student_profiles       student_profiles[]
+}
+
+model leaderboard_entries {
+  id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  period_type      leaderboard_period
+  period_start     DateTime?          @db.Date
+  student_id       String             @db.Uuid
+  points           Int
+  rank             Int
+  created_at       DateTime           @default(now()) @db.Timestamp(6)
+  student_profiles student_profiles   @relation(fields: [student_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model learning_progress {
+  id                 String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  student_id         String           @db.Uuid
+  lesson_id          String           @db.Uuid
+  status             progress_status  @default(not_started)
+  completion_percent Decimal          @default(0) @db.Decimal(5, 2)
+  mastery_score      Decimal?         @db.Decimal(5, 2)
+  last_accessed_at   DateTime?        @db.Timestamp(6)
+  lessons            lessons          @relation(fields: [lesson_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  student_profiles   student_profiles @relation(fields: [student_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([student_id, lesson_id])
+}
+
+model lesson_materials {
+  id           String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  lesson_id    String             @db.Uuid
+  type         material_type_enum
+  title        String?            @db.VarChar(255)
+  content_url  String?
+  content_text String?
+  order_index  Int                @default(0)
+  lessons      lessons            @relation(fields: [lesson_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model lessons {
+  id                String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  topic_id          String              @db.Uuid
+  title             String              @db.VarChar(255)
+  order_index       Int
+  summary           String?
+  key_formula       String?
+  learning_progress learning_progress[]
+  lesson_materials  lesson_materials[]
+  topics            topics              @relation(fields: [topic_id], references: [id], onUpdate: NoAction)
+  recommendations   recommendations[]
+}
+
+model math_glossary {
+  id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  topic_id    String? @db.Uuid
+  term_vi     String  @db.VarChar(255)
+  term_en     String  @db.VarChar(255)
+  description String?
+  topics      topics? @relation(fields: [topic_id], references: [id], onUpdate: NoAction)
+}
+
+model notifications {
+  id                  String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id             String            @db.Uuid
+  type                notification_type
+  title               String            @db.VarChar(255)
+  content             String?
+  is_read             Boolean           @default(false)
+  related_entity_type String?           @db.VarChar(50)
+  related_entity_id   String?           @db.Uuid
+  created_at          DateTime          @default(now()) @db.Timestamp(6)
+  user                user              @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model parent_profiles {
+  user_id                 String                 @id @db.Uuid
+  occupation              String?                @db.VarChar(100)
+  notification_preference Json?
+  user                    user                   @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  parent_student_links    parent_student_links[]
+}
+
+model parent_student_links {
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  parent_id        String           @db.Uuid
+  student_id       String           @db.Uuid
+  relationship     String?          @db.VarChar(50)
+  is_primary       Boolean          @default(true)
+  parent_profiles  parent_profiles  @relation(fields: [parent_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+  student_profiles student_profiles @relation(fields: [student_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([parent_id, student_id])
+}
+
+model point_transactions {
+  id                  String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  student_id          String           @db.Uuid
+  points              Int
+  reason              String?          @db.VarChar(255)
+  related_entity_type String?          @db.VarChar(50)
+  related_entity_id   String?          @db.Uuid
+  created_at          DateTime         @default(now()) @db.Timestamp(6)
+  student_profiles    student_profiles @relation(fields: [student_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model questions {
+  id                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  grade_id           String               @db.Uuid
+  chapter_id         String?              @db.Uuid
+  topic_id           String               @db.Uuid
+  type               question_type_enum
+  difficulty         difficulty_level
+  language           content_language     @default(vi)
+  content            String
+  content_data       Json?
+  correct_answer     Json
+  solution           String?
+  is_ai_generated    Boolean              @default(false)
+  created_by         String?              @db.Uuid
+  status             question_status      @default(approved)
+  created_at         DateTime             @default(now()) @db.Timestamp(6)
+  ai_conversations   ai_conversations[]
+  exercise_questions exercise_questions[]
+  chapters           chapters?            @relation(fields: [chapter_id], references: [id], onUpdate: NoAction)
+  user               user?                @relation(fields: [created_by], references: [id], onUpdate: NoAction)
+  grades             grades               @relation(fields: [grade_id], references: [id], onUpdate: NoAction)
+  topics             topics               @relation(fields: [topic_id], references: [id], onUpdate: NoAction)
+  submission_answers submission_answers[]
+
+  @@index([grade_id, topic_id, type, difficulty], map: "idx_questions_filter")
+}
+
+model recommendations {
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  student_id       String           @db.Uuid
+  lesson_id        String?          @db.Uuid
+  exercise_id      String?          @db.Uuid
+  reason           String?          @db.VarChar(255)
+  is_dismissed     Boolean          @default(false)
+  created_at       DateTime         @default(now()) @db.Timestamp(6)
+  exercises        exercises?       @relation(fields: [exercise_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  lessons          lessons?         @relation(fields: [lesson_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  student_profiles student_profiles @relation(fields: [student_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model student_badges {
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  student_id       String           @db.Uuid
+  badge_id         String           @db.Uuid
+  earned_at        DateTime         @default(now()) @db.Timestamp(6)
+  badges           badges           @relation(fields: [badge_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  student_profiles student_profiles @relation(fields: [student_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([student_id, badge_id])
+}
+
+model student_group_members {
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  group_id         String           @db.Uuid
+  student_id       String           @db.Uuid
+  student_groups   student_groups   @relation(fields: [group_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  student_profiles student_profiles @relation(fields: [student_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([group_id, student_id])
+}
+
+model student_groups {
+  id                        String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  class_id                  String                      @db.Uuid
+  name                      String                      @db.VarChar(100)
+  ability_level             ability_level_type?
+  assignments               assignments[]
+  class_analytics_snapshots class_analytics_snapshots[]
+  student_group_members     student_group_members[]
+  classes                   classes                     @relation(fields: [class_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model student_mission_progress {
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  student_id       String           @db.Uuid
+  mission_id       String           @db.Uuid
+  progress         Decimal          @default(0) @db.Decimal(5, 2)
+  status           mission_status   @default(in_progress)
+  completed_at     DateTime?        @db.Timestamp(6)
+  daily_missions   daily_missions   @relation(fields: [mission_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  student_profiles student_profiles @relation(fields: [student_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([student_id, mission_id])
+}
+
+model student_profiles {
+  user_id                  String                     @id @db.Uuid
+  grade_id                 String                     @db.Uuid
+  date_of_birth            DateTime?                  @db.Date
+  gender                   gender_type?
+  ability_level            ability_level_type?
+  total_points             Int                        @default(0)
+  current_streak           Int                        @default(0)
+  longest_streak           Int                        @default(0)
+  last_active_date         DateTime?                  @db.Date
+  ai_conversations         ai_conversations[]
+  analytics_snapshots      analytics_snapshots[]
+  assignments              assignments[]
+  challenge_participants   challenge_participants[]
+  class_enrollments        class_enrollments[]
+  leaderboard_entries      leaderboard_entries[]
+  learning_progress        learning_progress[]
+  parent_student_links     parent_student_links[]
+  point_transactions       point_transactions[]
+  recommendations          recommendations[]
+  student_badges           student_badges[]
+  student_group_members    student_group_members[]
+  student_mission_progress student_mission_progress[]
+  grades                   grades                     @relation(fields: [grade_id], references: [id], onUpdate: NoAction)
+  user                     user                       @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  submissions              submissions[]
+}
+
+model submission_answers {
+  id                 String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  submission_id      String      @db.Uuid
+  question_id        String      @db.Uuid
+  student_answer     Json?
+  is_correct         Boolean?
+  score              Decimal?    @db.Decimal(5, 2)
+  ai_feedback        String?
+  time_spent_seconds Int?
+  questions          questions   @relation(fields: [question_id], references: [id], onUpdate: NoAction)
+  submissions        submissions @relation(fields: [submission_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([submission_id, question_id])
+  @@index([submission_id], map: "idx_submission_answers_submission")
+}
+
+model submissions {
+  id                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  student_id         String               @db.Uuid
+  exercise_id        String               @db.Uuid
+  assignment_id      String?              @db.Uuid
+  status             submission_status    @default(in_progress)
+  total_score        Decimal?             @db.Decimal(6, 2)
+  max_score          Decimal?             @db.Decimal(6, 2)
+  time_spent_seconds Int?
+  started_at         DateTime             @default(now()) @db.Timestamp(6)
+  submitted_at       DateTime?            @db.Timestamp(6)
+  submission_answers submission_answers[]
+  assignments        assignments?         @relation(fields: [assignment_id], references: [id], onUpdate: NoAction)
+  exercises          exercises            @relation(fields: [exercise_id], references: [id], onUpdate: NoAction)
+  student_profiles   student_profiles     @relation(fields: [student_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([student_id, exercise_id], map: "idx_submissions_student_exercise")
+}
+
+model teacher_profiles {
+  user_id             String        @id @db.Uuid
+  subject_specialty   String?       @db.VarChar(100)
+  qualification       String?       @db.VarChar(255)
+  years_of_experience Int?
+  bio                 String?
+  assignments         assignments[]
+  classes             classes[]
+  user                user          @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model topics {
+  id                     String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  chapter_id             String                   @db.Uuid
+  name                   String                   @db.VarChar(255)
+  name_en                String?                  @db.VarChar(255)
+  order_index            Int
+  description            String?
+  ai_generation_requests ai_generation_requests[]
+  exercises              exercises[]
+  lessons                lessons[]
+  math_glossary          math_glossary[]
+  questions              questions[]
+  chapters               chapters                 @relation(fields: [chapter_id], references: [id], onUpdate: NoAction)
+}
+
+model user {
+  id                     String                   @id(map: "users_pkey") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  full_name              String                   @db.VarChar(255)
+  email                  String                   @unique(map: "users_email_key") @db.VarChar(255)
+  phone                  String?                  @db.VarChar(20)
+  password_hash          String                   @db.VarChar(255)
+  avatar_url             String?
+  role                   user_role
+  status                 account_status           @default(active)
+  last_login_at          DateTime?                @db.Timestamp(6)
+  created_at             DateTime                 @default(now()) @db.Timestamp(6)
+  updated_at             DateTime                 @default(now()) @db.Timestamp(6)
+  ai_generation_requests ai_generation_requests[]
+  exercises              exercises[]
+  notifications          notifications[]
+  parent_profiles        parent_profiles?
+  questions              questions[]
+  student_profiles       student_profiles?
+  teacher_profiles       teacher_profiles?
+}
+
+enum ability_level_type {
+  weak
+  average
+  good
+  excellent
+}
+
+enum account_status {
+  active
+  inactive
+  banned
+}
+
+enum analytics_period {
+  week
+  month
+}
+
+enum challenge_type_enum {
+  weekly
+  monthly
+}
+
+enum content_language {
+  vi
+  en
+}
+
+enum difficulty_level {
+  easy
+  medium
+  hard
+}
+
+enum difficulty_level_ext {
+  easy
+  medium
+  hard
+  mixed
+}
+
+enum enrollment_status {
+  active
+  left
+}
+
+enum exercise_type_enum {
+  worksheet
+  practice
+  quiz
+  review
+  advanced
+}
+
+enum gender_type {
+  male
+  female
+  other
+}
+
+enum generation_status {
+  processing
+  success
+  failed
+}
+
+enum leaderboard_period {
+  weekly
+  monthly
+  all_time
+}
+
+enum material_type_enum {
+  video
+  slide
+  example
+  document
+}
+
+enum message_language {
+  vi
+  en
+  bilingual
+}
+
+enum mission_status {
+  in_progress
+  completed
+}
+
+enum notification_type {
+  assignment
+  result
+  streak
+  badge
+  report
+  system
+}
+
+enum progress_status {
+  not_started
+  in_progress
+  completed
+}
+
+enum question_status {
+  draft
+  pending_review
+  approved
+  rejected
+}
+
+enum question_type_enum {
+  multiple_choice
+  fill_number
+  drag_drop
+  matching
+  fill_expression
+  ordering
+  input_answer
+  drawing
+  real_world
+  critical_thinking
+  stem
+}
+
+enum sender_type {
+  student
+  ai
+}
+
+enum submission_status {
+  in_progress
+  submitted
+  graded
+}
+
+enum user_role {
+  admin
+  teacher
+  student
+  parent
+}
