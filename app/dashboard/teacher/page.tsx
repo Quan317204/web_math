@@ -40,10 +40,10 @@ export default async function TeacherDashboard() {
       color: 'bg-blue-100',
     },
     {
-      title: 'Quản lý học sinh',
-      description: 'Xem danh sách và thông tin học sinh trong lớp.',
-      icon: '👨‍🎓',
-      href: '/dashboard/teacher/students',
+      title: 'Bài học sinh đã nộp',
+      description: 'Xem danh sách và thông tin bài học sinh đã nộp.',
+      icon: '📋',
+      href: '/dashboard/teacher/submissions',
       color: 'bg-purple-100',
     },
     {

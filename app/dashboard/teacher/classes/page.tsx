@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import TeacherPageHeader from '../TeacherPageHeader';
 
 type ClassItem = {
   id: string;
@@ -104,43 +105,22 @@ export default function TeacherClassesPage() {
     }
   }
 
-  return (
-    <div className="min-h-screen bg-slate-50 p-6">
-      <div className="mx-auto max-w-7xl">
-
-        {/* ================================================= */}
-        {/* HEADER */}
-        {/* ================================================= */}
-
-        <div className="mb-8">
-
-          {/* Nút quay về trang giáo viên */}
-          <Link
-            href="/dashboard/teacher"
-            className="mb-5 inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600"
-          >
-            ← Về trang giáo viên
-          </Link>
-
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-slate-900">
-                Quản lý lớp học
-              </h1>
-
-              <p className="mt-2 text-slate-500">
-                Tạo, chỉnh sửa và quản lý các lớp học của bạn.
-              </p>
-            </div>
-
+    return (
+    <div className="min-h-screen bg-gray-50">
+        <TeacherPageHeader
+        title="Quản lý lớp học"
+        description="Tạo, chỉnh sửa và quản lý các lớp học của bạn."
+        action={
             <Link
-              href="/dashboard/teacher/classes/create"
-              className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white transition hover:bg-blue-700"
+            href="/dashboard/teacher/classes/create"
+            className="inline-flex items-center rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
             >
-              + Tạo lớp học
+            + Tạo lớp học
             </Link>
-          </div>
-        </div>
+        }
+        />
+
+        <main className="mx-auto max-w-7xl px-6 py-8">
 
         {/* ================================================= */}
         {/* SEARCH */}
@@ -254,7 +234,7 @@ export default function TeacherClassesPage() {
             ))}
           </div>
         )}
+         </main>
       </div>
-    </div>
   );
 }
